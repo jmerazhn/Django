@@ -1,0 +1,75 @@
+{% extends "filtros/layout.html" %} 
+
+{% block head %}
+<script type="module">
+import { createApp, ref, watch, computed } from 'vue'
+
+const app = createApp({
+  setup() {
+    const file = ref();
+    const image = computed(() => file.value.files[0]);
+    const hasImageSelected = ref(false)
+
+    const preview = ref();
+    const options = ref(['bn', 'sepia', 'invertido'])
+    const picked = ref('');
+
+    const cookies = new UniversalCookie(null, { path: '/' });
+    
+    function changeImage(e) {
+      hasImageSelected.value = true;
+      const imagen = e.target.files[0]
+      const imgUrl = URL.createObjectURL(imagen)
+      preview.value.src = imgUrl;
+    }
+
+    async function handleFilterChange(e) {
+      if (image.value && e.target.type === 'radio') {
+        const formData = new FormData()
+
+        formData.append('image', image.value)
+        formData.append('filtro', picked.value)
+        formData.append('csrfmiddlewaretoken', cookies.get('csrftoken'))
+
+        const res = await fetch('aplicar_filtro/', { 
+          method: 'POST',
+          credentials: 'same-origin',
+          body: formData
+        })
+
+        const processedImage = await res.blob();
+
+        const imgUrl = URL.createObjectURL(processedImage)
+        preview.value.src = imgUrl;
+      }
+    }
+
+    return { file, preview, options, picked, changeImage, handleFilterChange, hasImageSelected }
+  }
+});
+
+// Configuracion y montado de Vue 3
+app.config.compilerOptions.delimiters = ['{', '}']
+app.mount('#app')
+</script>
+{% endblock %}
+
+
+{% block body %} 
+<div id="app">
+  <!-- Cambiar filtro imagen -->
+  <form enctype="multipart/form-data" @change="handleFilterChange">
+    {% csrf_token %}
+    <input ref="file" type="file" name="filtro" @change="changeImage">
+
+    <!-- Opciones de filtros -->
+    <div v-if="hasImageSelected" v-for="option in options" :key="option">
+      <input type="radio" :id="option" :value="option" v-model="picked" />
+      <label :for="option">{option}</label>
+    </div>
+  </form> 
+  
+  <!-- Vista previa de la imagen -->
+  <img ref="preview"></img>
+</div>
+{% endblock %}
